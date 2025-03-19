@@ -3,10 +3,7 @@ import platform
 import json
 import os
 
-def generate_mcp_config(ide_type):
-    """
-    Generate MCP configuration for the selected IDE type.
-    """
+def get_paths():
     # Get the absolute path to the current directory
     base_path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
     
@@ -17,7 +14,13 @@ def generate_mcp_config(ide_type):
         python_path = os.path.join(base_path, 'venv', 'bin', 'python')
     
     server_script_path = os.path.join(base_path, 'mcp', 'mcp_server.py')
-    
+
+    return python_path, server_script_path
+
+def generate_mcp_config(ide_type, python_path, server_script_path):
+    """
+    Generate MCP configuration for the selected IDE type.
+    """    
     # Create the config dictionary for Python
     python_config = {
         "mcpServers": {
@@ -95,7 +98,8 @@ def mcp_tab():
     if st.session_state.selected_ide:
         selected_ide = st.session_state.selected_ide
         st.subheader(f"MCP Configuration for {selected_ide}")
-        python_config, docker_config = generate_mcp_config(selected_ide)
+        python_path, server_script_path = get_paths()
+        python_config, docker_config = generate_mcp_config(selected_ide, python_path, server_script_path)
         
         # Configuration type tabs
         config_tab1, config_tab2 = st.tabs(["Docker Configuration", "Python Configuration"])
@@ -150,12 +154,16 @@ def mcp_tab():
             5. Cline/Roo Code will automatically detect and start the MCP server
             """)
         elif selected_ide == "Claude Code":
-            st.markdown("""
+            st.markdown(f"""
             #### How to use in Claude Code:
             1. Deploy and run Archon in Docker
             2. In the Archon UI, start the MCP service.
             3. Open a terminal and navigate to your work folder.
-            4. Execute this command: `claude mcp add Archon docker --  run -i --rm -e GRAPH_SERVICE_URL=http://host.docker.internal:8100 archon-mcp:latest `   
+            4. Execute the command: 
+            
+            \tFor Docker: `claude mcp add Archon docker run -i --rm -e GRAPH_SERVICE_URL=http://host.docker.internal:8100 archon-mcp:latest `   
+            \tFor Python: `claude mcp add Archon {python_path} {server_script_path}`
+            
             5. Start Claude Code with the command `claude`. When Claude Code starts, at the bottom of the welcome section will be a listing of connected MCP Services, Archon should be listed with a status of _connected_.
             6. You can now use the Archon MCP service in your Claude Code projects
                         
