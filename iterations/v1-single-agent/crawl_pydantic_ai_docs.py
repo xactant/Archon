@@ -12,16 +12,24 @@ from dotenv import load_dotenv
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from openai import AsyncOpenAI
-from supabase import create_client, Client
+#from supabase import create_client, Client
+from archon.utils.postgresql_db_factory import PostgresqlDbFactory
 
 load_dotenv()
 
-# Initialize OpenAI and Supabase clients
+# Initialize OpenAI and PostgreSql clients
 openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-supabase: Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_KEY")
-)
+pg_conn = None
+#supabase: Client = create_client(
+#    os.getenv("SUPABASE_URL"),
+#    os.getenv("SUPABASE_SERVICE_KEY")
+#)
+# Initialize PostgreSQL connection
+db_factory = PostgresqlDbFactory()
+try:
+    pg_conn = db_factory.createClient()
+except Exception as e:
+    pg_conn = None
 
 @dataclass
 class ProcessedChunk:
@@ -139,7 +147,7 @@ async def process_chunk(chunk: str, chunk_number: int, url: str) -> ProcessedChu
     )
 
 async def insert_chunk(chunk: ProcessedChunk):
-    """Insert a processed chunk into Supabase."""
+    """Insert a processed chunk into PostgreSql."""
     try:
         data = {
             "url": chunk.url,
@@ -147,11 +155,22 @@ async def insert_chunk(chunk: ProcessedChunk):
             "title": chunk.title,
             "summary": chunk.summary,
             "content": chunk.content,
-            "metadata": chunk.metadata,
+            "metadata": json.dumps(chunk.metadata),
             "embedding": chunk.embedding
         }
         
-        result = supabase.table("site_pages").insert(data).execute()
+        cursor = pg_conn.cursor()
+        query = """
+            INSERT INTO site_pages (url, chunk_number, title, summary, content, metadata, embedding) 
+            VALUES (%(url)s, %(chunk_number)s, %(title)s, %(summary)s, %(content)s, %(metadata)s, %(embedding)s)
+            RETURNING id
+        """
+        cursor.execute(query, data)
+        result = cursor.fetchone()
+        pg_conn.commit()
+        cursor.close()
+        
+        # result = supabase.table("site_pages").insert(data).execute()
         print(f"Inserted chunk {chunk.chunk_number} for {chunk.url}")
         return result
     except Exception as e:

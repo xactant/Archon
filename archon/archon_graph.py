@@ -8,7 +8,10 @@ from langgraph.config import get_stream_writer
 from langgraph.types import interrupt
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-from supabase import Client
+# from supabase import Client
+import psycopg2
+import psycopg2.extras
+from psycopg2 import sql, connect
 import logfire
 import os
 import sys
@@ -63,7 +66,7 @@ end_conversation_agent = Agent(
 )
 
 # Initialize clients
-embedding_client, supabase = get_clients()
+embedding_client, pg_conn = get_clients()
 
 # Define state schema
 class AgentState(TypedDict):
@@ -79,7 +82,7 @@ class AgentState(TypedDict):
 # Scope Definition Node with Reasoner LLM
 async def define_scope_with_reasoner(state: AgentState):
     # First, get the documentation pages so the reasoner can decide which ones are necessary
-    documentation_pages = await list_documentation_pages_tool(supabase)
+    documentation_pages = await list_documentation_pages_tool(pg_conn)
     documentation_pages_str = "\n".join(documentation_pages)
 
     # Then, use the reasoner to define the scope
@@ -117,7 +120,7 @@ async def define_scope_with_reasoner(state: AgentState):
 async def coder_agent(state: AgentState, writer):    
     # Prepare dependencies
     deps = PydanticAIDeps(
-        supabase=supabase,
+        pg_conn=pg_conn,
         embedding_client=embedding_client,
         reasoner_output=state['scope']
     )
@@ -218,7 +221,7 @@ async def refine_prompt(state: AgentState):
 async def refine_tools(state: AgentState):
     # Prepare dependencies
     deps = ToolsRefinerDeps(
-        supabase=supabase,
+        pg_conn=pg_conn,
         embedding_client=embedding_client
     )
 
@@ -238,7 +241,7 @@ async def refine_tools(state: AgentState):
 async def refine_agent(state: AgentState):
     # Prepare dependencies
     deps = AgentRefinerDeps(
-        supabase=supabase,
+        pg_conn=pg_conn,
         embedding_client=embedding_client
     )
 

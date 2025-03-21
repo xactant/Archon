@@ -1,4 +1,7 @@
-from supabase import Client, create_client
+# from supabase import Client, create_client
+import psycopg2
+import psycopg2.extras
+from archon.utils.postgresql_db_factory import PostgresqlDbFactory
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from datetime import datetime
@@ -396,14 +399,23 @@ def get_clients():
         embedding_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     # Supabase client setup
-    supabase = None
-    supabase_url = get_env_var("SUPABASE_URL")
-    supabase_key = get_env_var("SUPABASE_SERVICE_KEY")
-    if supabase_url and supabase_key:
-        try:
-            supabase: Client = Client(supabase_url, supabase_key)
-        except Exception as e:
-            print(f"Failed to initialize Supabase: {e}")
-            write_to_log(f"Failed to initialize Supabase: {e}")
+    # supabase = None
+    # supabase_url = get_env_var("SUPABASE_URL")
+    # supabase_key = get_env_var("SUPABASE_SERVICE_KEY")
+    # if supabase_url and supabase_key:
+    #    try:
+    #        supabase: Client = Client(supabase_url, supabase_key)
+    #    except Exception as e:
+    #        print(f"Failed to initialize Supabase: {e}")
+    #        write_to_log(f"Failed to initialize Supabase: {e}")
+    
+    # Initialize PostgreSQL connection
+    db_factory = PostgresqlDbFactory()
+    pg_conn = None
 
-    return embedding_client, supabase      
+    try:
+        pg_conn = db_factory.createClient()
+    except Exception as e:
+        st.error(f"Error connecting to PostgreSQL: {str(e)}")
+        pg_conn = None
+    return embedding_client, pg_conn # supabase      

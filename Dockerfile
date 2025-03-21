@@ -5,6 +5,8 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    && apt-get -y install libpq-dev gcc \
+    && pip install psycopg2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

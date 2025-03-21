@@ -29,7 +29,8 @@ from streamlit_pages.future_enhancements import future_enhancements_tab
 load_dotenv()
 
 # Initialize clients
-openai_client, supabase = get_clients()
+# openai_client, supabase = get_clients()
+openai_client, pg_conn = get_clients()
 
 # Load custom CSS styles
 load_css()
@@ -102,10 +103,10 @@ async def main():
         agent_service_tab()
     elif st.session_state.selected_tab == "Database":
         st.title("Archon - Database Configuration")
-        database_tab(supabase)
+        database_tab(pg_conn) # supabase)
     elif st.session_state.selected_tab == "Documentation":
         st.title("Archon - Documentation")
-        documentation_tab(supabase)
+        documentation_tab(pg_conn) #supabase)
     elif st.session_state.selected_tab == "Future Enhancements":
         st.title("Archon - Future Enhancements")
         future_enhancements_tab()

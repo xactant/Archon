@@ -24,8 +24,8 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 load_dotenv()
 
-# Initialize embedding and Supabase clients
-embedding_client, supabase = get_clients()
+# Initialize embedding and PostgreSql clients
+embedding_client, pg_conn = get_clients()
 
 # Define the embedding model for embedding the documentation for RAG
 embedding_model = get_env_var('EMBEDDING_MODEL') or 'text-embedding-3-small'
@@ -246,7 +246,7 @@ async def process_chunk(chunk: str, chunk_number: int, url: str) -> ProcessedChu
     )
 
 async def insert_chunk(chunk: ProcessedChunk):
-    """Insert a processed chunk into Supabase."""
+    """Insert a processed chunk into PostgreSql."""
     try:
         data = {
             "url": chunk.url,
@@ -258,7 +258,17 @@ async def insert_chunk(chunk: ProcessedChunk):
             "embedding": chunk.embedding
         }
         
-        result = supabase.table("site_pages").insert(data).execute()
+        # result = supabase.table("site_pages").insert(data).execute()
+        cursor = pg_conn.cursor()
+        query = """
+            INSERT INTO site_pages (url, chunk_number, title, summary, content, metadata, embedding) 
+            VALUES (%(url)s, %(chunk_number)s, %(title)s, %(summary)s, %(content)s, %(metadata)s, %(embedding)s)
+            RETURNING id
+        """
+        cursor.execute(query, data)
+        result = cursor.fetchone()
+        pg_conn.commit()
+        cursor.close()
         print(f"Inserted chunk {chunk.chunk_number} for {chunk.url}")
         return result
     except Exception as e:
@@ -423,11 +433,18 @@ def get_pydantic_ai_docs_urls() -> List[str]:
 def clear_existing_records():
     """Clear all existing records with source='pydantic_ai_docs' from the site_pages table."""
     try:
-        result = supabase.table("site_pages").delete().eq("metadata->>source", "pydantic_ai_docs").execute()
-        print("Cleared existing pydantic_ai_docs records from site_pages")
-        return result
+        cursor = pg_conn.cursor()
+        query = "DELETE FROM site_pages WHERE metadata::jsonb->>'source' = 'pydantic_ai_docs'"
+        cursor.execute(query)
+        rowcount = cursor.rowcount
+        pg_conn.commit()
+        cursor.close()
+        
+        print(f"Cleared {rowcount} existing pydantic_ai_docs records from site_pages")
+        return rowcount
     except Exception as e:
         print(f"Error clearing existing records: {e}")
+        pg_conn.rollback()
         return None
 
 async def main_with_requests(tracker: Optional[CrawlProgressTracker] = None):

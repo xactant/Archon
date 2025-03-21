@@ -14,7 +14,10 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIModel
 from openai import AsyncOpenAI
-from supabase import Client
+# from supabase import Client
+import psycopg2
+import psycopg2.extras
+from psycopg2 import sql, connect
 
 # Add the parent directory to sys.path to allow importing from the parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,7 +42,7 @@ logfire.configure(send_to_logfire='if-token-present')
 
 @dataclass
 class PydanticAIDeps:
-    supabase: Client
+    pg_conn: connect
     embedding_client: AsyncOpenAI
     reasoner_output: str
 
@@ -64,13 +67,13 @@ async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_
     Retrieve relevant documentation chunks based on the query with RAG.
     
     Args:
-        ctx: The context including the Supabase client and OpenAI client
+        ctx: The context including the PostgreSql client and OpenAI client
         user_query: The user's question or query
         
     Returns:
         A formatted string containing the top 4 most relevant documentation chunks
     """
-    return await retrieve_relevant_documentation_tool(ctx.deps.supabase, ctx.deps.embedding_client, user_query)
+    return await retrieve_relevant_documentation_tool(ctx.deps.pg_conn, ctx.deps.embedding_client, user_query)
 
 @pydantic_ai_coder.tool
 async def list_documentation_pages(ctx: RunContext[PydanticAIDeps]) -> List[str]:
@@ -80,7 +83,7 @@ async def list_documentation_pages(ctx: RunContext[PydanticAIDeps]) -> List[str]
     Returns:
         List[str]: List of unique URLs for all documentation pages
     """
-    return await list_documentation_pages_tool(ctx.deps.supabase)
+    return await list_documentation_pages_tool(ctx.deps.pg_conn)
 
 @pydantic_ai_coder.tool
 async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
@@ -88,10 +91,10 @@ async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
     Retrieve the full content of a specific documentation page by combining all its chunks.
     
     Args:
-        ctx: The context including the Supabase client
+        ctx: The context including the PostgreSql client
         url: The URL of the page to retrieve
         
     Returns:
         str: The complete page content with all chunks combined in order
     """
-    return await get_page_content_tool(ctx.deps.supabase, url)
+    return await get_page_content_tool(ctx.deps.pg_conn, url)

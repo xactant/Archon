@@ -14,7 +14,10 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIModel
 from openai import AsyncOpenAI
-from supabase import Client
+#from supabase import Client
+import psycopg2
+import psycopg2.extras
+from psycopg2 import sql, connect
 
 # Add the parent directory to sys.path to allow importing from the parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -40,7 +43,7 @@ logfire.configure(send_to_logfire='if-token-present')
 
 @dataclass
 class ToolsRefinerDeps:
-    supabase: Client
+    pg_conn: connect
     embedding_client: AsyncOpenAI
 
 tools_refiner_agent = Agent(
