@@ -12,6 +12,11 @@ import json
 import sys
 import os
 
+from archon.db.db_client import DbClient
+from archon.db.db_factory import DbFactory
+from archon.db.models import ProcessedChunk, DatabaseClients
+from utils.env_utils import get_env_var, write_to_log
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load environment variables from .env file
@@ -386,7 +391,6 @@ def get_clients():
     base_url = get_env_var('EMBEDDING_BASE_URL') or 'https://api.openai.com/v1'
     api_key = get_env_var('EMBEDDING_API_KEY') or 'no-api-key-provided'
     provider = get_env_var('EMBEDDING_PROVIDER') or 'OpenAI'
-    
     # Setup OpenAI client for LLM
     if provider == "Ollama":
         if api_key == "NOT_REQUIRED":
@@ -395,15 +399,8 @@ def get_clients():
     else:
         embedding_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
 
-    # Supabase client setup
-    supabase = None
-    supabase_url = get_env_var("SUPABASE_URL")
-    supabase_key = get_env_var("SUPABASE_SERVICE_KEY")
-    if supabase_url and supabase_key:
-        try:
-            supabase: Client = Client(supabase_url, supabase_key)
-        except Exception as e:
-            print(f"Failed to initialize Supabase: {e}")
-            write_to_log(f"Failed to initialize Supabase: {e}")
+    # Database client setup
+    database_client_name = get_env_var("DATABASE_CLIENT_NAME") or "supabase"
+    dbClient = DbFactory().create_client(database_client_name)
 
-    return embedding_client, supabase      
+    return embedding_client, dbClient      

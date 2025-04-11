@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
 from openai import AsyncOpenAI
-from supabase import Client
+from archon.db.db_client import DbClient
 import sys
 import os
 
@@ -21,27 +21,23 @@ async def get_embedding(text: str, embedding_client: AsyncOpenAI) -> List[float]
         print(f"Error getting embedding: {e}")
         return [0] * 1536  # Return zero vector on error
 
-async def retrieve_relevant_documentation_tool(supabase: Client, embedding_client: AsyncOpenAI, user_query: str) -> str:
+async def retrieve_relevant_documentation_tool(dbClient: DbClient, embedding_client: AsyncOpenAI, user_query: str) -> str:
     try:
         # Get the embedding for the query
         query_embedding = await get_embedding(user_query, embedding_client)
         
-        # Query Supabase for relevant documents
-        result = supabase.rpc(
-            'match_site_pages',
-            {
-                'query_embedding': query_embedding,
-                'match_count': 4,
-                'filter': {'source': 'pydantic_ai_docs'}
-            }
-        ).execute()
+        result = await dbClient.match_site_pages(
+            query_embedding=query_embedding,
+            match_count=4,
+            filter={'source': 'pydantic_ai_docs'}
+        )
         
-        if not result.data:
+        if not result:
             return "No relevant documentation found."
             
         # Format the results
         formatted_chunks = []
-        for doc in result.data:
+        for doc in result:
             chunk_text = f"""
 # {doc['title']}
 
@@ -56,7 +52,7 @@ async def retrieve_relevant_documentation_tool(supabase: Client, embedding_clien
         print(f"Error retrieving documentation: {e}")
         return f"Error retrieving documentation: {str(e)}" 
 
-async def list_documentation_pages_tool(supabase: Client) -> List[str]:
+async def list_documentation_pages_tool(dbClient: DbClient) -> List[str]:
     """
     Function to retrieve a list of all available Pydantic AI documentation pages.
     This is called by the list_documentation_pages tool and also externally
@@ -66,52 +62,44 @@ async def list_documentation_pages_tool(supabase: Client) -> List[str]:
         List[str]: List of unique URLs for all documentation pages
     """
     try:
-        # Query Supabase for unique URLs where source is pydantic_ai_docs
-        result = supabase.from_('site_pages') \
-            .select('url') \
-            .eq('metadata->>source', 'pydantic_ai_docs') \
-            .execute()
+        # Query dbClient for unique URLs where source is pydantic_ai_docs
+        result = await dbClient.list_documentation_pages(source='pydantic_ai_docs')
         
-        if not result.data:
+        if not result:
             return []
             
         # Extract unique URLs
-        urls = sorted(set(doc['url'] for doc in result.data))
+        urls = sorted(set(doc['url'] for doc in result))
         return urls
         
     except Exception as e:
         print(f"Error retrieving documentation pages: {e}")
         return []
 
-async def get_page_content_tool(supabase: Client, url: str) -> str:
+async def get_page_content_tool(dbClient: DbClient, url: str) -> str:
     """
     Retrieve the full content of a specific documentation page by combining all its chunks.
     
     Args:
-        ctx: The context including the Supabase client
+        ctx: The context including the dbClient
         url: The URL of the page to retrieve
         
     Returns:
         str: The complete page content with all chunks combined in order
     """
     try:
-        # Query Supabase for all chunks of this URL, ordered by chunk_number
-        result = supabase.from_('site_pages') \
-            .select('title, content, chunk_number') \
-            .eq('url', url) \
-            .eq('metadata->>source', 'pydantic_ai_docs') \
-            .order('chunk_number') \
-            .execute()
+        # Query dbClient for all chunks of this URL, ordered by chunk_number
+        result = await dbClient.get_page_content(url=url, source='pydantic_ai_docs')
         
-        if not result.data:
+        if not result:
             return f"No content found for URL: {url}"
             
         # Format the page with its title and all chunks
-        page_title = result.data[0]['title'].split(' - ')[0]  # Get the main title
+        page_title = result[0]['title'].split(' - ')[0]  # Get the main title
         formatted_content = [f"# {page_title}\n"]
         
         # Add each chunk's content
-        for chunk in result.data:
+        for chunk in result:
             formatted_content.append(chunk['content'])
             
         # Join everything together but limit the characters in case the page is massive (there are a coule big ones)

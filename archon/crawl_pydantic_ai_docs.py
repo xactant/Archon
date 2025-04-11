@@ -8,24 +8,25 @@ import json
 import time
 from typing import List, Dict, Any, Optional, Callable
 from xml.etree import ElementTree
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 import re
 import html2text
+from archon.db.models import ProcessedChunk
 
 # Add the parent directory to sys.path to allow importing from the parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils import get_env_var, get_clients
+from archon.db.models import ProcessedChunk
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 load_dotenv()
 
 # Initialize embedding and Supabase clients
-embedding_client, supabase = get_clients()
+embedding_client, dbClient = get_clients()
 
 # Define the embedding model for embedding the documentation for RAG
 embedding_model = get_env_var('EMBEDDING_MODEL') or 'text-embedding-3-small'
@@ -50,16 +51,6 @@ html_converter.ignore_links = False
 html_converter.ignore_images = False
 html_converter.ignore_tables = False
 html_converter.body_width = 0  # No wrapping
-
-@dataclass
-class ProcessedChunk:
-    url: str
-    chunk_number: int
-    title: str
-    summary: str
-    content: str
-    metadata: Dict[str, Any]
-    embedding: List[float]
 
 class CrawlProgressTracker:
     """Class to track progress of the crawling process."""
@@ -246,19 +237,9 @@ async def process_chunk(chunk: str, chunk_number: int, url: str) -> ProcessedChu
     )
 
 async def insert_chunk(chunk: ProcessedChunk):
-    """Insert a processed chunk into Supabase."""
+    """Insert a processed chunk into the dataset."""
     try:
-        data = {
-            "url": chunk.url,
-            "chunk_number": chunk.chunk_number,
-            "title": chunk.title,
-            "summary": chunk.summary,
-            "content": chunk.content,
-            "metadata": chunk.metadata,
-            "embedding": chunk.embedding
-        }
-        
-        result = supabase.table("site_pages").insert(data).execute()
+        result = dbClient.insert_chunk(chunk)
         print(f"Inserted chunk {chunk.chunk_number} for {chunk.url}")
         return result
     except Exception as e:
@@ -421,87 +402,53 @@ def get_pydantic_ai_docs_urls() -> List[str]:
         return []
 
 def clear_existing_records():
-    """Clear all existing records with source='pydantic_ai_docs' from the site_pages table."""
+    """Clear existing records from the database."""
     try:
-        result = supabase.table("site_pages").delete().eq("metadata->>source", "pydantic_ai_docs").execute()
-        print("Cleared existing pydantic_ai_docs records from site_pages")
-        return result
+        # Clear all records from the site_pages table
+        result = asyncio.run(dbClient.clear_site_pages(exclude_ids=None))
+        if result:
+            print(f"Cleared {result['deleted']} existing records")
+        else:
+            print("No records to clear")
     except Exception as e:
         print(f"Error clearing existing records: {e}")
-        return None
 
 async def main_with_requests(tracker: Optional[CrawlProgressTracker] = None):
-    """Main function using direct HTTP requests instead of browser automation."""
+    """Main function to crawl Pydantic AI documentation."""
     try:
-        # Start tracking if tracker is provided
-        if tracker:
-            tracker.start()
-        else:
-            print("Starting crawling process...")
-        
-        # Clear existing records first
-        if tracker:
-            tracker.log("Clearing existing Pydantic AI docs records...")
-        else:
-            print("Clearing existing Pydantic AI docs records...")
+        # Clear existing records
         clear_existing_records()
-        if tracker:
-            tracker.log("Existing records cleared")
-        else:
-            print("Existing records cleared")
         
-        # Get URLs from Pydantic AI docs
-        if tracker:
-            tracker.log("Fetching URLs from Pydantic AI sitemap...")
-        else:
-            print("Fetching URLs from Pydantic AI sitemap...")
+        # Get list of URLs to crawl
         urls = get_pydantic_ai_docs_urls()
         
-        if not urls:
-            if tracker:
-                tracker.log("No URLs found to crawl")
-                tracker.complete()
-            else:
-                print("No URLs found to crawl")
-            return
-        
+        # Start tracking progress
         if tracker:
+            tracker.start()
             tracker.urls_found = len(urls)
-            tracker.log(f"Found {len(urls)} URLs to crawl")
-        else:
-            print(f"Found {len(urls)} URLs to crawl")
         
-        # Crawl the URLs using direct HTTP requests
+        # Crawl the URLs
         await crawl_parallel_with_requests(urls, tracker)
         
-        # Mark as complete if tracker is provided
+        # Mark as completed
         if tracker:
             tracker.complete()
-        else:
-            print("Crawling process completed")
             
     except Exception as e:
+        print(f"Error in main: {e}")
         if tracker:
-            tracker.log(f"Error in crawling process: {str(e)}")
+            tracker.log(f"Error in main: {e}")
             tracker.complete()
-        else:
-            print(f"Error in crawling process: {str(e)}")
 
 def start_crawl_with_requests(progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None) -> CrawlProgressTracker:
-    """Start the crawling process using direct HTTP requests in a separate thread and return the tracker."""
+    """Start the crawling process with a progress tracker."""
     tracker = CrawlProgressTracker(progress_callback)
     
     def run_crawl():
-        try:
-            asyncio.run(main_with_requests(tracker))
-        except Exception as e:
-            print(f"Error in crawl thread: {e}")
-            tracker.log(f"Thread error: {str(e)}")
-            tracker.complete()
+        asyncio.run(main_with_requests(tracker))
     
-    # Start the crawling process in a separate thread
+    # Start the crawl in a separate thread
     thread = threading.Thread(target=run_crawl)
-    thread.daemon = True
     thread.start()
     
     return tracker

@@ -14,10 +14,10 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIModel
 from openai import AsyncOpenAI
-from supabase import Client
 
 # Add the parent directory to sys.path to allow importing from the parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from archon.db.db_client import DbClient
 from utils.utils import get_env_var
 from archon.agent_prompts import tools_refiner_prompt
 from archon.agent_tools import (
@@ -41,7 +41,7 @@ logfire.configure(send_to_logfire='if-token-present')
 
 @dataclass
 class ToolsRefinerDeps:
-    supabase: Client
+    dbClient: DbClient
     embedding_client: AsyncOpenAI
     file_list: List[str]
 
@@ -72,13 +72,13 @@ async def retrieve_relevant_documentation(ctx: RunContext[ToolsRefinerDeps], que
     Make sure your searches always focus on implementing tools.
     
     Args:
-        ctx: The context including the Supabase client and OpenAI client
+        ctx: The context including the Supadatabasebase client and OpenAI client
         query: Your query to retrieve relevant documentation for implementing tools
         
     Returns:
         A formatted string containing the top 4 most relevant documentation chunks
     """
-    return await retrieve_relevant_documentation_tool(ctx.deps.supabase, ctx.deps.embedding_client, query)
+    return await retrieve_relevant_documentation_tool(ctx.deps.dbClient, ctx.deps.embedding_client, query)
 
 @tools_refiner_agent.tool
 async def list_documentation_pages(ctx: RunContext[ToolsRefinerDeps]) -> List[str]:
@@ -89,7 +89,7 @@ async def list_documentation_pages(ctx: RunContext[ToolsRefinerDeps]) -> List[st
     Returns:
         List[str]: List of unique URLs for all documentation pages
     """
-    return await list_documentation_pages_tool(ctx.deps.supabase)
+    return await list_documentation_pages_tool(ctx.deps.dbClient)
 
 @tools_refiner_agent.tool
 async def get_page_content(ctx: RunContext[ToolsRefinerDeps], url: str) -> str:
@@ -98,13 +98,13 @@ async def get_page_content(ctx: RunContext[ToolsRefinerDeps], url: str) -> str:
     Only use this tool to get pages related to using tools with Pydantic AI.
     
     Args:
-        ctx: The context including the Supabase client
+        ctx: The context including the database client
         url: The URL of the page to retrieve
         
     Returns:
         str: The complete page content with all chunks combined in order
     """
-    return await get_page_content_tool(ctx.deps.supabase, url)
+    return await get_page_content_tool(ctx.deps.dbClient, url)
 
 @tools_refiner_agent.tool_plain
 def get_file_content(file_path: str) -> str:

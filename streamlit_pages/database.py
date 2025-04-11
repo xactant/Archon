@@ -3,69 +3,31 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from archon.db.db_client import DbClient
 from utils.utils import get_env_var
-
+from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 @st.cache_data
 def load_sql_template():
     """Load the SQL template file and cache it"""
     with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "utils", "site_pages.sql"), "r") as f:
         return f.read()
 
-def get_supabase_sql_editor_url(supabase_url):
-    """Get the URL for the Supabase SQL Editor"""
-    try:
-        # Extract the project reference from the URL
-        # Format is typically: https://<project-ref>.supabase.co
-        if '//' in supabase_url and 'supabase' in supabase_url:
-            parts = supabase_url.split('//')
-            if len(parts) > 1:
-                domain_parts = parts[1].split('.')
-                if len(domain_parts) > 0:
-                    project_ref = domain_parts[0]
-                    return f"https://supabase.com/dashboard/project/{project_ref}/sql/new"
-        
-        # Fallback to a generic URL
-        return "https://supabase.com/dashboard"
-    except Exception:
-        return "https://supabase.com/dashboard"
+def get_database_subpages(db_client: DbClient):
+    factory = DatabaseSubpagesFactory(db_client)
+    return factory.get_subpage('database')
 
-def show_manual_sql_instructions(sql, vector_dim, recreate=False):
-    """Show instructions for manually executing SQL in Supabase"""
-    st.info("### Manual SQL Execution Instructions")
-    
-    # Provide a link to the Supabase SQL Editor
-    supabase_url = get_env_var("SUPABASE_URL")
-    if supabase_url:
-        dashboard_url = get_supabase_sql_editor_url(supabase_url)
-        st.markdown(f"**Step 1:** [Open Your Supabase SQL Editor with this URL]({dashboard_url})")
-    else:
-        st.markdown("**Step 1:** Open your Supabase Dashboard and navigate to the SQL Editor")
-    
-    st.markdown("**Step 2:** Create a new SQL query")
-    
-    if recreate:
-        st.markdown("**Step 3:** Copy and execute the following SQL:")
-        drop_sql = f"DROP FUNCTION IF EXISTS match_site_pages(vector({vector_dim}), int, jsonb);\nDROP TABLE IF EXISTS site_pages CASCADE;"
-        st.code(drop_sql, language="sql")
-        
-        st.markdown("**Step 4:** Then copy and execute this SQL:")
-        st.code(sql, language="sql")
-    else:
-        st.markdown("**Step 3:** Copy and execute the following SQL:")
-        st.code(sql, language="sql")
-    
-    st.success("After executing the SQL, return to this page and refresh to see the updated table status.")
-
-def database_tab(supabase):
+def database_tab(db_client: DbClient):
     """Display the database configuration interface"""
     st.header("Database Configuration")
-    st.write("Set up and manage your Supabase database tables for Archon.")
+    st.write("Set up and manage your database tables for Archon.")
     
-    # Check if Supabase is configured
-    if not supabase:
-        st.error("Supabase is not configured. Please set your Supabase URL and Service Key in the Environment tab.")
+    # Check if DB Client is configured
+    if not db_client:
+        st.error(db_subpage.get_not_setup_message())
         return
     
+    db_subpage = get_database_subpages(db_client)
+
     # Site Pages Table Setup
     st.subheader("Site Pages Table")
     st.write("This table stores web page content and embeddings for semantic search.")
@@ -88,7 +50,7 @@ def database_tab(supabase):
         It also creates:
         - A vector similarity search function
         - Appropriate indexes for performance
-        - Row-level security policies for Supabase
+        - Row-level security policies
         """)
     
     # Check if the table already exists
@@ -97,19 +59,22 @@ def database_tab(supabase):
     
     try:
         # Try to query the table to see if it exists
-        response = supabase.table("site_pages").select("id").limit(1).execute()
-        table_exists = True
+        table_exists = db_subpage.check_table_exists()
         
-        # Check if the table has data
-        count_response = supabase.table("site_pages").select("*", count="exact").execute()
-        row_count = count_response.count if hasattr(count_response, 'count') else 0
-        table_has_data = row_count > 0
-        
-        st.success("✅ The site_pages table already exists in your database.")
-        if table_has_data:
-            st.info(f"The table contains data ({row_count} rows).")
+        if table_exists:
+            # Check if the table has data
+            count_response = db_subpage.count_site_pages()
+            row_count = count_response.count
+            table_has_data = row_count > 0
+            
+            st.success("✅ The site_pages table already exists in your database.")
+
+            if table_has_data:
+                st.info(f"The table contains data ({row_count} rows).")
+            else:
+                st.info("The table exists but contains no data.")
         else:
-            st.info("The table exists but contains no data.")
+            st.info("The site_pages table does not exist yet. You can create it below.")
     except Exception as e:
         error_str = str(e)
         if "relation" in error_str and "does not exist" in error_str:
@@ -134,10 +99,7 @@ def database_tab(supabase):
     sql_template = load_sql_template()
     
     # Replace the vector dimensions in the SQL
-    sql = sql_template.replace("vector(1536)", f"vector({vector_dim})")
-    
-    # Also update the match_site_pages function dimensions
-    sql = sql.replace("query_embedding vector(1536)", f"query_embedding vector({vector_dim})")
+    sql = db_subpage.get_site_pages_sql(sql_template, vector_dim)
     
     # Show the SQL
     with st.expander("View SQL", expanded=False):
@@ -146,7 +108,7 @@ def database_tab(supabase):
     # Create table button
     if not table_exists:
         if st.button("Get Instructions for Creating Site Pages Table"):
-            show_manual_sql_instructions(sql, vector_dim)
+            db_subpage.show_manual_sql_instructions(st, sql, vector_dim)
     else:
         # Option to recreate the table or clear data
         col1, col2 = st.columns(2)
@@ -154,7 +116,7 @@ def database_tab(supabase):
         with col1:
             st.warning("⚠️ Recreating will delete all existing data.")
             if st.button("Get Instructions for Recreating Site Pages Table"):
-                show_manual_sql_instructions(sql, vector_dim, recreate=True)
+                db_subpage.show_manual_sql_instructions(st, sql, vector_dim, recreate=True)
         
         with col2:
             if table_has_data:
@@ -162,8 +124,8 @@ def database_tab(supabase):
                 if st.button("Clear Table Data"):
                     try:
                         with st.spinner("Clearing table data..."):
-                            # Use the Supabase client to delete all rows
-                            response = supabase.table("site_pages").delete().neq("id", 0).execute()
+                            # Use the DB client to delete all rows
+                            response = db_subpage.clear_site_pages()
                             st.success("✅ Table data cleared successfully!")
                             st.rerun()
                     except Exception as e:
@@ -171,10 +133,5 @@ def database_tab(supabase):
                         # Fall back to manual SQL
                         truncate_sql = "TRUNCATE TABLE site_pages;"
                         st.code(truncate_sql, language="sql")
-                        st.info("Execute this SQL in your Supabase SQL Editor to clear the table data.")
-                        
-                        # Provide a link to the Supabase SQL Editor
-                        supabase_url = get_env_var("SUPABASE_URL")
-                        if supabase_url:
-                            dashboard_url = get_supabase_sql_editor_url(supabase_url)
-                            st.markdown(f"[Open Your Supabase SQL Editor with this URL]({dashboard_url})")    
+
+                        db_subpage.show_manual_truncate_instructions(st) 
