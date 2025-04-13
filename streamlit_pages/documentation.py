@@ -10,15 +10,15 @@ from archon.crawl_pydantic_ai_docs import start_crawl_with_requests, clear_exist
 from utils.utils import get_env_var, create_new_tab_button
 from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 
-def get_database_subpages(db_client: DbClient):
+def get_documentation_subpages(db_client: DbClient):
     factory = DatabaseSubpagesFactory(db_client)
-    return factory.get_subpage('database')
+    return factory.get_subpage('documentation')
 
 def documentation_tab(db_client):
     """Display the documentation interface"""
     st.header("Documentation")
     
-    doc_subpage = get_database_subpages(db_client)
+    doc_subpage = get_documentation_subpages(db_client)
 
     # Check if DB Client is configured
     if not db_client:

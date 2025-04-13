@@ -96,7 +96,7 @@ async def main():
         mcp_tab()
     elif st.session_state.selected_tab == "Environment":
         st.title("Archon - Environment Configuration")
-        environment_tab()
+        environment_tab(dbClient)
     elif st.session_state.selected_tab == "Agent Service":
         st.title("Archon - Agent Service")
         agent_service_tab()

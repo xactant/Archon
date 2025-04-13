@@ -401,3 +401,36 @@ class PostgreSqlClient(DbClient):
             print(f"Error checking client configuration: {e}")
             write_to_log(f"Error checking client configuration: {e}")
             return False
+        
+    async def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        Get example data from the database.
+        
+        Args:
+            source: The source identifier for the example data
+            
+        Returns:
+            List of example data records
+        """
+        sql = f"""
+            SELECT 
+                url, title, summary, chunk_number
+            FROM site_pages
+            WHERE metadata->>'source' = $1
+            LIMIT $2
+            """ 
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(sql, source, limit)
+                
+                # Convert rows to dictionaries
+                result = []
+                for row in rows:
+                    result.append(dict(row))
+                
+                return result
+        except Exception as e:
+            print(f"Error retrieving example data: {e}")
+            write_to_log(f"Error retrieving example data: {e}")
+            return []
+        

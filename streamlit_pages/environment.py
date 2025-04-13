@@ -1,6 +1,7 @@
 import streamlit as st
 import sys
 import os
+from archon.db.db_client import DbClient
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils import (
@@ -8,12 +9,18 @@ from utils.utils import (
     get_current_profile, set_current_profile, get_all_profiles,
     create_profile, delete_profile, get_profile_env_vars
 )
+from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 
-def environment_tab():    
+def get_environment_subpages(db_client: DbClient):
+    factory = DatabaseSubpagesFactory(db_client)
+    return factory.get_subpage('environment')
+
+def environment_tab(db_client):    
     # Get all available profiles and current profile
     profiles = get_all_profiles()
     current_profile = get_current_profile()
-    
+    env_subpage = get_environment_subpages(db_client)
+
     # Profile management section
     st.subheader("Profile Management")
     st.write("Profiles allow you to store different sets of environment variables for different providers or use cases.")
@@ -318,32 +325,8 @@ def environment_tab():
         # 3. Database Section
         st.header("3. Database")
         
-        # SUPABASE_URL
-        supabase_url_help = "Get your SUPABASE_URL from the API section of your Supabase project settings -\nhttps://supabase.com/dashboard/project/<your project ID>/settings/api"
-        
-        supabase_url = st.text_input(
-            "SUPABASE_URL:",
-            value=profile_env_vars.get("SUPABASE_URL", ""),
-            help=supabase_url_help,
-            key="input_SUPABASE_URL"
-        )
-        updated_values["SUPABASE_URL"] = supabase_url
-        
-        # SUPABASE_SERVICE_KEY
-        supabase_key_help = "Get your SUPABASE_SERVICE_KEY from the API section of your Supabase project settings -\nhttps://supabase.com/dashboard/project/<your project ID>/settings/api\nOn this page it is called the service_role secret."
-        
-        # If there's already a value, show asterisks in the placeholder
-        placeholder = "Set but hidden" if profile_env_vars.get("SUPABASE_SERVICE_KEY", "") else ""
-        supabase_key = st.text_input(
-            "SUPABASE_SERVICE_KEY:",
-            type="password",
-            help=supabase_key_help,
-            key="input_SUPABASE_SERVICE_KEY",
-            placeholder=placeholder
-        )
-        # Only update if user entered something (to avoid overwriting with empty string)
-        if supabase_key:
-            updated_values["SUPABASE_SERVICE_KEY"] = supabase_key
+        # Database information
+        env_subpage.show_database_info(st, profile_env_vars, updated_values)
         
         # Submit button
         submitted = st.form_submit_button("Save Environment Variables")

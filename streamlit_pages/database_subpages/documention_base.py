@@ -14,9 +14,8 @@ class DocumentationBase(ABC):
     def get_not_setup_message(self):
         pass
     
-    @abstractmethod
     def get_sample_data(self):
-        pass
+        return asyncio.run(self.db_client.get_sample_data())
 
     def db_client_configured(self):
         return self.db_client.client_configured()

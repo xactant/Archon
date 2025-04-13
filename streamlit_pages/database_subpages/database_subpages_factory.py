@@ -3,6 +3,9 @@ from archon.db.db_client import DbClient
 from supabase.supabase_database import SupabaseDatabase
 from supabase.supabase_documentation import SupabaseDocumentation
 from supabase.supabase_environment import SupabaseEnvironment
+from postgresql.postgresql_database import PostgresqlDatabase
+from postgresql.postgresql_documentation import PostgresqlDocumentation
+from postgresql.postgresql_environment import PostgresqlEnvironment
 
 class DatabaseSubpagesFactory:
     def __init__(self, db_client: DbClient):
@@ -19,5 +22,11 @@ class DatabaseSubpagesFactory:
                 return SupabaseDocumentation(self.db_client)
             case 'supabase_environment':
                 return SupabaseEnvironment(self.db_client)
+            case 'postgresql_database':
+                return PostgresqlDatabase(self.db_client)
+            case 'postgresql_documentation':
+                return PostgresqlDocumentation(self.db_client)
+            case 'postgresql_environment':
+                return PostgresqlEnvironment(self.db_client) 
             case _:
                 raise ValueError(f'Invalid subpage name: {subpage_name}')

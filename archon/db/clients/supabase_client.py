@@ -237,3 +237,15 @@ class SupabaseClient(DbClient):
             True if the client is configured, False otherwise
         """
         return self.supabase is not None
+    
+    async def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        Get example data from the database.
+        
+        Args:
+            source: The source identifier for the example data
+            
+        Returns:
+            List of example data records
+        """
+        return self.db_client.table("site_pages").select("url,title,summary,chunk_number").eq("metadata->>source", "pydantic_ai_docs").limit(10).execute()

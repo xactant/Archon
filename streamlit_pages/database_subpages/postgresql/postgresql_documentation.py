@@ -1,12 +1,10 @@
-import asyncio
 from archon.db.db_client import DbClient
 from .. import DocumentationBase
 
-
-class SupabaseDocumentation(DocumentationBase):
+class PostgresqlDocumentation(DocumentationBase):
     def __init__(self, db_client: DbClient):
         super().__init__(db_client)
-        
+    
     def get_db_name(self) -> str:
         """
         Get the name of the database client.
@@ -14,8 +12,10 @@ class SupabaseDocumentation(DocumentationBase):
         Returns:
             str: The name of the database client.
         """
-        return self.db_client.db_name().capitalize()   
+        return self.db_client.db_name().capitalize() 
     
     def get_not_setup_message(self):
-        """Get the message to display if Supabase is not configured"""
-        return "Supabase is not configured. Please set your Supabase URL and Service Key in the Environment tab."
+        """
+        Returns a message indicating that the PostgreSQL database is not set up.
+        """
+        return "PostgreSQL database is not set up. Please configure it in the environment settings."
