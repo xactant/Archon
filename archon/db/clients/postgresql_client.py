@@ -386,3 +386,18 @@ class PostgreSqlClient(DbClient):
             print(f"Error clearing by source: {e}")
             write_to_log(f"Error clearing by source: {e}")
             return None
+        
+    async def client_configured(self) -> bool:
+        """
+        Check if the database client is configured.
+        
+        Returns:
+            True if the client is configured, False otherwise
+        """
+        try:
+            # Check if the connection pool is initialized
+            return self.pool is not None
+        except Exception as e:
+            print(f"Error checking client configuration: {e}")
+            write_to_log(f"Error checking client configuration: {e}")
+            return False

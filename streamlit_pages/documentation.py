@@ -3,20 +3,34 @@ import time
 import sys
 import os
 
+from archon.db.db_client import DbClient
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from archon.crawl_pydantic_ai_docs import start_crawl_with_requests, clear_existing_records
 from utils.utils import get_env_var, create_new_tab_button
+from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 
-def documentation_tab(supabase_client):
+def get_database_subpages(db_client: DbClient):
+    factory = DatabaseSubpagesFactory(db_client)
+    return factory.get_subpage('database')
+
+def documentation_tab(db_client):
     """Display the documentation interface"""
     st.header("Documentation")
+    
+    doc_subpage = get_database_subpages(db_client)
+
+    # Check if DB Client is configured
+    if not db_client:
+        st.error(doc_subpage.get_not_setup_message())
+        return
     
     # Create tabs for different documentation sources
     doc_tabs = st.tabs(["Pydantic AI Docs", "Future Sources"])
     
     with doc_tabs[0]:
         st.subheader("Pydantic AI Documentation")
-        st.markdown("""
+        st.markdown(f"""
         This section allows you to crawl and index the Pydantic AI documentation.
         The crawler will:
         
@@ -24,17 +38,13 @@ def documentation_tab(supabase_client):
         2. Crawl each page and extract content
         3. Split content into chunks
         4. Generate embeddings for each chunk
-        5. Store the chunks in the Supabase database
+        5. Store the chunks in the {doc_subpage.get_db_name()} database
         
         This process may take several minutes depending on the number of pages.
         """)
         
-        # Check if the database is configured
-        supabase_url = get_env_var("SUPABASE_URL")
-        supabase_key = get_env_var("SUPABASE_SERVICE_KEY")
-        
-        if not supabase_url or not supabase_key:
-            st.warning("⚠️ Supabase is not configured. Please set up your environment variables first.")
+        if doc_subpage.client_configured() is False:
+            st.warning(f"⚠️ {doc_subpage.get_db_name()} is not configured. Please set up your environment variables first.")
             create_new_tab_button("Go to Environment Section", "Environment", key="goto_env_from_docs")
         else:
             # Initialize session state for tracking crawl progress
@@ -137,7 +147,8 @@ def documentation_tab(supabase_client):
         st.subheader("Database Statistics")
         try:            
             # Query the count of Pydantic AI docs
-            result = supabase_client.table("site_pages").select("count", count="exact").eq("metadata->>source", "pydantic_ai_docs").execute()
+            result = doc_subpage.count_site_pages()
+
             count = result.count if hasattr(result, "count") else 0
             
             # Display the count
@@ -146,7 +157,7 @@ def documentation_tab(supabase_client):
             # Add a button to view the data
             if count > 0 and st.button("View Indexed Data", key="view_pydantic_data"):
                 # Query a sample of the data
-                sample_data = supabase_client.table("site_pages").select("url,title,summary,chunk_number").eq("metadata->>source", "pydantic_ai_docs").limit(10).execute()
+                sample_data = doc_subpage.get_sample_data()
                 
                 # Display the sample data
                 st.dataframe(sample_data.data)

@@ -227,3 +227,13 @@ class SupabaseClient(DbClient):
         except Exception as e:
             print(f"Error clearing by source: {e}")
             return None
+    
+
+    async def client_configured(self) -> bool:
+        """
+        Check if the database client is configured.
+        
+        Returns:
+            True if the client is configured, False otherwise
+        """
+        return self.supabase is not None

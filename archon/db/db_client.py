@@ -133,3 +133,14 @@ class DbClient(ABC):
             Result of the deletion operation, or None if an error occurred
         """
         pass
+        
+    @abstractmethod
+    async def client_configured(self) -> bool:
+        """
+        Check if the database client is configured.
+        
+        Returns:
+            True if the client is configured, False otherwise
+        """
+        pass
+  

@@ -21,12 +21,12 @@ def database_tab(db_client: DbClient):
     st.header("Database Configuration")
     st.write("Set up and manage your database tables for Archon.")
     
+    db_subpage = get_database_subpages(db_client)
+
     # Check if DB Client is configured
     if not db_client:
         st.error(db_subpage.get_not_setup_message())
         return
-    
-    db_subpage = get_database_subpages(db_client)
 
     # Site Pages Table Setup
     st.subheader("Site Pages Table")
