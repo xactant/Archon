@@ -26,7 +26,7 @@ async def retrieve_relevant_documentation_tool(dbClient: DbClient, embedding_cli
         # Get the embedding for the query
         query_embedding = await get_embedding(user_query, embedding_client)
         
-        result = await dbClient.match_site_pages(
+        result = dbClient.match_site_pages(
             query_embedding=query_embedding,
             match_count=4,
             filter={'source': 'pydantic_ai_docs'}
@@ -52,7 +52,7 @@ async def retrieve_relevant_documentation_tool(dbClient: DbClient, embedding_cli
         print(f"Error retrieving documentation: {e}")
         return f"Error retrieving documentation: {str(e)}" 
 
-async def list_documentation_pages_tool(dbClient: DbClient) -> List[str]:
+def list_documentation_pages_tool(dbClient: DbClient) -> List[str]:
     """
     Function to retrieve a list of all available Pydantic AI documentation pages.
     This is called by the list_documentation_pages tool and also externally
@@ -63,7 +63,7 @@ async def list_documentation_pages_tool(dbClient: DbClient) -> List[str]:
     """
     try:
         # Query dbClient for unique URLs where source is pydantic_ai_docs
-        result = await dbClient.list_documentation_pages(source='pydantic_ai_docs')
+        result = dbClient.list_documentation_pages(source='pydantic_ai_docs')
         
         if not result:
             return []
@@ -76,7 +76,7 @@ async def list_documentation_pages_tool(dbClient: DbClient) -> List[str]:
         print(f"Error retrieving documentation pages: {e}")
         return []
 
-async def get_page_content_tool(dbClient: DbClient, url: str) -> str:
+def get_page_content_tool(dbClient: DbClient, url: str) -> str:
     """
     Retrieve the full content of a specific documentation page by combining all its chunks.
     
@@ -89,7 +89,7 @@ async def get_page_content_tool(dbClient: DbClient, url: str) -> str:
     """
     try:
         # Query dbClient for all chunks of this URL, ordered by chunk_number
-        result = await dbClient.get_page_content(url=url, source='pydantic_ai_docs')
+        result = dbClient.get_page_content(url=url, source='pydantic_ai_docs')
         
         if not result:
             return f"No content found for URL: {url}"

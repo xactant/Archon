@@ -5,7 +5,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from archon.db.db_client import DbClient
 from utils.utils import get_env_var
-from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
+from streamlit_pages.database_subpages.database_subpages_factory import DatabaseSubpagesFactory
+
 @st.cache_data
 def load_sql_template():
     """Load the SQL template file and cache it"""
@@ -63,8 +64,7 @@ def database_tab(db_client: DbClient):
         
         if table_exists:
             # Check if the table has data
-            count_response = db_subpage.count_site_pages()
-            row_count = count_response.count
+            row_count = db_subpage.count_site_pages()
             table_has_data = row_count > 0
             
             st.success("✅ The site_pages table already exists in your database.")

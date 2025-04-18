@@ -74,7 +74,7 @@ class SupabaseClient(DbClient):
             print(f"Error in match_site_pages: {e}")
             return []
     
-    async def insert_chunk(
+    def insert_chunk(
         self,
         chunk: ProcessedChunk
     ) -> Union[Dict[str, Any], None]:
@@ -104,7 +104,7 @@ class SupabaseClient(DbClient):
             print(f"Error inserting chunk: {e}")
             return None
     
-    async def list_documentation_pages(
+    def list_documentation_pages(
         self,
         source: str = 'pydantic_ai_docs'
     ) -> List[str]:
@@ -133,7 +133,7 @@ class SupabaseClient(DbClient):
             print(f"Error retrieving documentation pages: {e}")
             return []
     
-    async def get_page_content(
+    def get_page_content(
         self,
         url: str,
         source: str = 'pydantic_ai_docs'
@@ -228,8 +228,7 @@ class SupabaseClient(DbClient):
             print(f"Error clearing by source: {e}")
             return None
     
-
-    async def client_configured(self) -> bool:
+    def client_configured(self) -> bool:
         """
         Check if the database client is configured.
         
@@ -238,7 +237,7 @@ class SupabaseClient(DbClient):
         """
         return self.supabase is not None
     
-    async def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
+    def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
         """
         Get example data from the database.
         

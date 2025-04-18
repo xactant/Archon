@@ -3,6 +3,9 @@ from utils.env_utils import get_env_var
 from .. import DatabaseBase
 
 class PostgresqlDatabase(DatabaseBase):
+    """
+    Subclass for PostgreSQL database operations.
+    """
     def __init__(self, db_client: DbClient):
         super().__init__(db_client)
     
@@ -63,3 +66,9 @@ class PostgresqlDatabase(DatabaseBase):
             response = True
 
         return response
+    
+    def count_site_pages(self):
+        """
+        Count the total number of records in the site_pages table.
+        """
+        return self.db_client.count_site_pages()

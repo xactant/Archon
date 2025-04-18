@@ -20,6 +20,7 @@ from pydantic_ai.messages import (
 
 # Add the parent directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from archon.db.db_factory import DbFactory
 from archon.pydantic_ai_coder import pydantic_ai_coder, PydanticAIDeps
 from archon.advisor_agent import advisor_agent, AdvisorDeps
 from archon.refiner_agents.prompt_refiner_agent import prompt_refiner_agent
@@ -81,7 +82,7 @@ class AgentState(TypedDict):
 # Scope Definition Node with Reasoner LLM
 async def define_scope_with_reasoner(state: AgentState):
     # First, get the documentation pages so the reasoner can decide which ones are necessary
-    documentation_pages = await list_documentation_pages_tool(dbClient)
+    documentation_pages = list_documentation_pages_tool(dbClient)
     documentation_pages_str = "\n".join(documentation_pages)
 
     # Then, use the reasoner to define the scope

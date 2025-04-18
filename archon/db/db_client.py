@@ -19,7 +19,7 @@ class DbClient(ABC):
         return self.name
     
     @abstractmethod
-    async def match_site_pages(
+    def match_site_pages(
         self, 
         query_embedding: List[float], 
         match_count: int, 
@@ -39,7 +39,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def insert_chunk(
+    def insert_chunk(
         self,
         chunk: ProcessedChunk
     ) -> Union[Dict[str, Any], None]:
@@ -55,7 +55,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def list_documentation_pages(
+    def list_documentation_pages(
         self,
         source: str = 'pydantic_ai_docs'
     ) -> List[str]:
@@ -71,7 +71,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def get_page_content(
+    def get_page_content(
         self,
         url: str,
         source: str = 'pydantic_ai_docs'
@@ -89,7 +89,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def count_site_pages(self) -> int:
+    def count_site_pages(self) -> int:
         """
         Count the total number of records in the site_pages table.
         
@@ -99,7 +99,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def check_table_exists(self) -> bool:
+    def check_table_exists(self) -> bool:
         """
         Check if the site_pages table exists and has at least one record.
         
@@ -109,7 +109,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def clear_site_pages(self, exclude_ids: Optional[List[int]] = None) -> Union[Dict[str, Any], None]:
+    def clear_site_pages(self, exclude_ids: Optional[List[int]] = None) -> Union[Dict[str, Any], None]:
         """
         Clear all records from the site_pages table, optionally excluding specific IDs.
         
@@ -122,7 +122,7 @@ class DbClient(ABC):
         pass
     
     @abstractmethod
-    async def clear_by_source(self, source: str) -> Union[Dict[str, Any], None]:
+    def clear_by_source(self, source: str) -> Union[Dict[str, Any], None]:
         """
         Clear all records with a specific source from the site_pages table.
         
@@ -135,7 +135,7 @@ class DbClient(ABC):
         pass
         
     @abstractmethod
-    async def client_configured(self) -> bool:
+    def client_configured(self) -> bool:
         """
         Check if the database client is configured.
         
@@ -145,7 +145,7 @@ class DbClient(ABC):
         pass
 
     @abstractmethod
-    async def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
+    def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
         """
         Get example data from the database.
         

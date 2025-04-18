@@ -2,11 +2,12 @@ from typing import Dict, List, Any, Optional, Union
 import asyncio
 import asyncpg
 import json
+import os
+import nest_asyncio
 
 from archon.db.db_client import DbClient
 from archon.db.models import ProcessedChunk
 from utils.env_utils import write_to_log
-
 
 class PostgreSqlClient(DbClient):
     """
@@ -16,7 +17,7 @@ class PostgreSqlClient(DbClient):
     using PostgreSQL as the backend.
     """
     
-    def __init__(self, connection_pool: asyncpg.Pool):
+    def __init__(self):
         """
         Initialize the PostgreSqlClient with a connection pool.
         
@@ -24,66 +25,75 @@ class PostgreSqlClient(DbClient):
             connection_pool: An initialized asyncpg connection pool
         """
         super().__init__('postgresql')
-        self.pool = connection_pool
+        self._pool = None
         self._current_db = None
         self._loop = None
-    
+        self._create_connection()
+
     def _get_event_loop(self):
-        """Get or create an event loop for async operations."""
-        if self._loop is None:
-            try:
-                self._loop = asyncio.get_event_loop()
-            except RuntimeError:
-                self._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(self._loop)
-        return self._loop
-    
+        """Get the current event loop."""
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+
+    def _create_connection(self):
+        """Create the database connection pool."""
+        try:
+            if self._pool is not None:
+                raise ValueError("Connection pool already exists")
+
+            host = os.getenv('POSTGRES_HOST', 'localhost')
+            port = int(os.getenv('POSTGRES_PORT', '5432'))
+            user = os.getenv('POSTGRES_USER', 'postgres')
+            password = os.getenv('POSTGRES_PASSWORD', '')
+            database = os.getenv('POSTGRES_DB', 'postgres')
+            min_size = int(os.getenv('POSTGRES_MIN_CONN', '1'))
+            max_size = int(os.getenv('POSTGRES_MAX_CONN', '10'))
+
+            # Create connection pool using nest_asyncio to handle nested event loops
+            nest_asyncio.apply()
+            
+            loop = self._get_event_loop()
+            self._pool = loop.run_until_complete(asyncpg.create_pool(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database,
+                min_size=min_size,
+                max_size=max_size
+            ))
+            self._current_db = database
+
+        except Exception as e:
+            error_msg = f"Failed to create PostgreSQL connection: {str(e)}"
+            print(error_msg)
+            write_to_log(error_msg)
+            raise ValueError(error_msg)
+
     def which_db(self):
-        """Get the current database name synchronously."""
-        if self._current_db is None:
-            try:
-                # Get the event loop
-                loop = self._get_event_loop()
-                
-                # Run the async operation in a new loop if the current one is running
-                if loop.is_running():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    self._current_db = new_loop.run_until_complete(self._which_db())
-                    asyncio.set_event_loop(loop)  # Restore original loop
-                else:
-                    self._current_db = loop.run_until_complete(self._which_db())
-            except Exception as e:
-                print(f"Error retrieving database name: {e}")
-                write_to_log(f"Error retrieving database name: {e}")
-                self._current_db = []
-        
-        print(f"Current database: {self._current_db}")
+        """Return the current database name."""
         return self._current_db
     
-    async def _which_db(
-            self,
-            source: str = 'pydantic_ai_docs'
-        ) -> List[str]:
+    def match_site_pages(
+        self, 
+        query_embedding: List[float], 
+        match_count: int, 
+        filter: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Find pages that match the given query embedding using vector similarity search."""
         try:
-            # Query for current database
-            sql = """
-            SELECT current_database();
-            """
-            
-            # Execute query
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(sql)
-                
-                # Extract the database name
-                db_names = [row['current_database'] for row in rows]
-                return db_names
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._match_site_pages(query_embedding, match_count, filter))
         except Exception as e:
-            print(f"Error retrieving database name: {e}")
-            write_to_log(f"Error retrieving database name: {e}")
+            print(f"Error matching site pages: {e}")
+            write_to_log(f"Error matching site pages: {e}")
             return []
-    
-    async def match_site_pages(
+
+    async def _match_site_pages(
         self, 
         query_embedding: List[float], 
         match_count: int, 
@@ -124,7 +134,7 @@ class PostgreSqlClient(DbClient):
             params.append(match_count)
             
             # Execute the query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 rows = await conn.fetch(sql, *params)
                 
                 # Convert rows to dictionaries
@@ -142,7 +152,20 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error in match_site_pages: {e}")
             return []
     
-    async def insert_chunk(
+    def insert_chunk(
+        self,
+        chunk: ProcessedChunk
+    ) -> Union[Dict[str, Any], None]:
+        """Insert a processed document chunk into the database."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._insert_chunk(chunk))
+        except Exception as e:
+            print(f"Error inserting chunk: {e}")
+            write_to_log(f"Error inserting chunk: {e}")
+            return None
+
+    async def _insert_chunk(
         self,
         chunk: ProcessedChunk
     ) -> Union[Dict[str, Any], None]:
@@ -164,7 +187,7 @@ class PostgreSqlClient(DbClient):
             """
             
             # Insert with asyncpg
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 row = await conn.fetchrow(
                     sql, 
                     chunk.url,
@@ -193,8 +216,21 @@ class PostgreSqlClient(DbClient):
             print(f"Error inserting chunk: {e}")
             write_to_log(f"Error inserting chunk: {e}")
             return None
-    
-    async def list_documentation_pages(
+ 
+    def list_documentation_pages(
+        self,
+        source: str = 'pydantic_ai_docs'
+    ) -> List[str]:
+        """Retrieve a list of all available documentation pages for a specific source."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._list_documentation_pages(source))
+        except Exception as e:
+            print(f"Error listing documentation pages: {e}")
+            write_to_log(f"Error listing documentation pages: {e}")
+            return []
+
+    async def _list_documentation_pages(
         self,
         source: str = 'pydantic_ai_docs'
     ) -> List[str]:
@@ -216,7 +252,7 @@ class PostgreSqlClient(DbClient):
             """
             
             # Execute query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 rows = await conn.fetch(sql, source)
                 
                 # Extract URLs
@@ -227,7 +263,21 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error listing documentation pages: {e}")
             return []
     
-    async def get_page_content(
+    def get_page_content(
+        self,
+        url: str,
+        source: str = 'pydantic_ai_docs'
+    ) -> List[Dict[str, Any]]:
+        """Retrieve the content of a specific documentation page by URL."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._get_page_content(url, source))
+        except Exception as e:
+            print(f"Error getting page content: {e}")
+            write_to_log(f"Error getting page content: {e}")
+            return []
+
+    async def _get_page_content(
         self,
         url: str,
         source: str = 'pydantic_ai_docs'
@@ -252,7 +302,7 @@ class PostgreSqlClient(DbClient):
             """
             
             # Execute query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 rows = await conn.fetch(sql, url, source)
                 
                 # Convert to dictionaries
@@ -266,7 +316,17 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error retrieving page content: {e}")
             return []
     
-    async def count_site_pages(self) -> int:
+    def count_site_pages(self) -> int:
+        """Count the total number of records in the site_pages table."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._count_site_pages())
+        except Exception as e:
+            print(f"Error counting site pages: {e}")
+            write_to_log(f"Error counting site pages: {e}")
+            return 0
+    
+    async def _count_site_pages(self) -> int:
         """
         Count the total number of records in the site_pages table.
         
@@ -274,19 +334,50 @@ class PostgreSqlClient(DbClient):
             The exact count of records in the site_pages table
         """
         try:
-            # Query for count
-            sql = "SELECT COUNT(*) FROM site_pages"
+            # Get the event loop
+            loop = self._get_event_loop()
             
-            # Execute query
-            async with self.pool.acquire() as conn:
-                count = await conn.fetchval(sql)
-                return count
+            # Run the query in the correct event loop context
+            if loop.is_running():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    # Create a new connection directly instead of using pool
+                    conn = await asyncpg.connect(
+                        host=os.getenv('POSTGRES_HOST', 'localhost'),
+                        port=int(os.getenv('POSTGRES_PORT', '5432')),
+                        user=os.getenv('POSTGRES_USER', 'postgres'),
+                        password=os.getenv('POSTGRES_PASSWORD', ''),
+                        database=os.getenv('POSTGRES_DB', 'postgres')
+                    )
+                    try:
+                        count = await conn.fetchval("SELECT COUNT(*) FROM site_pages")
+                        return count if count is not None else 0
+                    finally:
+                        await conn.close()
+                finally:
+                    asyncio.set_event_loop(loop)  # Restore original loop
+            else:
+                # Use the pool in the current event loop
+                async with self._pool.acquire() as conn:
+                    count = await conn.fetchval("SELECT COUNT(*) FROM site_pages")
+                    return count if count is not None else 0
         except Exception as e:
             print(f"Error counting site pages: {e}")
             write_to_log(f"Error counting site pages: {e}")
             return 0
-    
-    async def check_table_exists(self) -> bool:
+   
+    def check_table_exists(self) -> bool:
+        """Check if the site_pages table exists and has at least one record."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._check_table_exists())
+        except Exception as e:
+            print(f"Error checking if table exists: {e}")
+            write_to_log(f"Error checking if table exists: {e}")
+            return False
+        
+    async def _check_table_exists(self) -> bool:
         """
         Check if the site_pages table exists and has at least one record.
         
@@ -304,7 +395,7 @@ class PostgreSqlClient(DbClient):
             """
             
             # Execute query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 exists = await conn.fetchval(sql)
                 if not exists:
                     return False
@@ -317,7 +408,20 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error checking if table exists: {e}")
             return False
     
-    async def clear_site_pages(self, exclude_ids: Optional[List[int]] = None) -> Union[Dict[str, Any], None]:
+    def clear_site_pages(
+        self, 
+        exclude_ids: Optional[List[int]] = None
+    ) -> Union[Dict[str, Any], None]:
+        """Clear all records from the site_pages table."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._clear_site_pages(exclude_ids))
+        except Exception as e:
+            print(f"Error clearing site pages: {e}")
+            write_to_log(f"Error clearing site pages: {e}")
+            return None
+
+    async def _clear_site_pages(self, exclude_ids: Optional[List[int]] = None) -> Union[Dict[str, Any], None]:
         """
         Clear all records from the site_pages table, optionally excluding specific IDs.
         
@@ -341,7 +445,7 @@ class PostgreSqlClient(DbClient):
                 sql += ", ".join(placeholders) + ")"
             
             # Execute query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 # Get the count of rows that will be deleted
                 count_sql = "SELECT COUNT(*) FROM site_pages"
                 if exclude_ids and len(exclude_ids) > 0:
@@ -359,7 +463,20 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error clearing site pages: {e}")
             return None
     
-    async def clear_by_source(self, source: str) -> Union[Dict[str, Any], None]:
+    def clear_by_source(
+        self, 
+        source: str
+    ) -> Union[Dict[str, Any], None]:
+        """Clear all records with a specific source from the site_pages table."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._clear_by_source(source))
+        except Exception as e:
+            print(f"Error clearing by source: {e}")
+            write_to_log(f"Error clearing by source: {e}")
+            return None
+
+    async def _clear_by_source(self, source: str) -> Union[Dict[str, Any], None]:
         """
         Clear all records with a specific source from the site_pages table.
         
@@ -374,7 +491,7 @@ class PostgreSqlClient(DbClient):
             sql = "DELETE FROM site_pages WHERE metadata->>'source' = $1"
             
             # Execute query
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 # Get the count of rows that will be deleted
                 count = await conn.fetchval("SELECT COUNT(*) FROM site_pages WHERE metadata->>'source' = $1", source)
                 
@@ -387,7 +504,7 @@ class PostgreSqlClient(DbClient):
             write_to_log(f"Error clearing by source: {e}")
             return None
         
-    async def client_configured(self) -> bool:
+    def client_configured(self) -> bool:
         """
         Check if the database client is configured.
         
@@ -396,13 +513,27 @@ class PostgreSqlClient(DbClient):
         """
         try:
             # Check if the connection pool is initialized
-            return self.pool is not None
+            return self._pool is not None
         except Exception as e:
             print(f"Error checking client configuration: {e}")
             write_to_log(f"Error checking client configuration: {e}")
             return False
         
-    async def get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
+    def get_example_data(
+        self, 
+        source: str, 
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """Get example data from the database."""
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(self._get_example_data(source, limit))
+        except Exception as e:
+            print(f"Error getting example data: {e}")
+            write_to_log(f"Error getting example data: {e}")
+            return []
+
+    async def _get_example_data(self, source: str, limit: int) -> List[Dict[str, Any]]:
         """
         Get example data from the database.
         
@@ -420,7 +551,7 @@ class PostgreSqlClient(DbClient):
             LIMIT $2
             """ 
         try:
-            async with self.pool.acquire() as conn:
+            async with self._pool.acquire() as conn:
                 rows = await conn.fetch(sql, source, limit)
                 
                 # Convert rows to dictionaries

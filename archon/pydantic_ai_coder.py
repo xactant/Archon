@@ -64,7 +64,7 @@ def add_reasoner_output(ctx: RunContext[str]) -> str:
     """
 
 @pydantic_ai_coder.tool
-async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_query: str) -> str:
+def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_query: str) -> str:
     """
     Retrieve relevant documentation chunks based on the query with RAG.
     
@@ -75,20 +75,20 @@ async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_
     Returns:
         A formatted string containing the top 4 most relevant documentation chunks
     """
-    return await retrieve_relevant_documentation_tool(ctx.deps.dbClient, ctx.deps.embedding_client, user_query)
+    return retrieve_relevant_documentation_tool(ctx.deps.dbClient, ctx.deps.embedding_client, user_query)
 
 @pydantic_ai_coder.tool
-async def list_documentation_pages(ctx: RunContext[PydanticAIDeps]) -> List[str]:
+def list_documentation_pages(ctx: RunContext[PydanticAIDeps]) -> List[str]:
     """
     Retrieve a list of all available Pydantic AI documentation pages.
     
     Returns:
         List[str]: List of unique URLs for all documentation pages
     """
-    return await list_documentation_pages_tool(ctx.deps.dbClient)
+    return list_documentation_pages_tool(ctx.deps.dbClient)
 
 @pydantic_ai_coder.tool
-async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
+def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
     """
     Retrieve the full content of a specific documentation page by combining all its chunks.
     
@@ -99,4 +99,4 @@ async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
     Returns:
         str: The complete page content with all chunks combined in order
     """
-    return await get_page_content_tool(ctx.deps.dbClient, url)
+    return get_page_content_tool(ctx.deps.dbClient, url)

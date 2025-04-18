@@ -236,7 +236,7 @@ async def process_chunk(chunk: str, chunk_number: int, url: str) -> ProcessedChu
         embedding=embedding
     )
 
-async def insert_chunk(chunk: ProcessedChunk):
+def insert_chunk(chunk: ProcessedChunk):
     """Insert a processed chunk into the dataset."""
     try:
         result = dbClient.insert_chunk(chunk)
@@ -405,7 +405,7 @@ def clear_existing_records():
     """Clear existing records from the database."""
     try:
         # Clear all records from the site_pages table
-        result = asyncio.run(dbClient.clear_site_pages(exclude_ids=None))
+        result = dbClient.clear_site_pages(exclude_ids=None)
         if result:
             print(f"Cleared {result['deleted']} existing records")
         else:

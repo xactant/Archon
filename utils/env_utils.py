@@ -2,6 +2,10 @@ import os
 import json
 from datetime import datetime
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def write_to_log(message: str):
     """Write a message to the logs.txt file in the workbench directory.

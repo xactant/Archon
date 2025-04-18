@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from archon.db.db_client import DbClient
-import asyncio
 
 class DatabaseBase(ABC):
+    """
+    Base class for database subpages.
+    """
     def __init__(self, db_client: DbClient):
         self.db_client = db_client
     
@@ -17,30 +19,29 @@ class DatabaseBase(ABC):
     @abstractmethod
     def show_manual_truncate_instructions(self, st):
         pass
+
+    @abstractmethod
+    def count_site_pages(self):
+        pass
     
+
     def check_table_exists(self):
         """
         Check if the site_pages table exists.
         """
-        return asyncio.run(self.db_client.check_table_exists())
-    
-    def count_site_pages(self):
-        """
-        Count the total number of records in the site_pages table.
-        """
-        return asyncio.run(self.db_client.count_site_pages())
+        return self.db_client.check_table_exists()
     
     def clear_site_pages(self):
         """
         Clear all records from the site_pages table.
         """
-        return asyncio.run(self.db_client.clear_site_pages())
+        return self.db_client.clear_site_pages()
     
     def clear_by_source(self, source):
         """
         Clear all records from the site_pages table for a specific source.
         """
-        return asyncio.run(self.db_client.clear_by_source(source))
+        return self.db_client.clear_by_source(source)
     
     def get_site_pages_sql(self, sql_template: str, vector_dim: int):
         """

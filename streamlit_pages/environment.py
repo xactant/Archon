@@ -9,7 +9,7 @@ from utils.utils import (
     get_current_profile, set_current_profile, get_all_profiles,
     create_profile, delete_profile, get_profile_env_vars
 )
-from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
+from streamlit_pages.database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 
 def get_environment_subpages(db_client: DbClient):
     factory = DatabaseSubpagesFactory(db_client)
@@ -45,6 +45,7 @@ def environment_tab(db_client):
                     del st.session_state.embedding_provider
                 
                 st.success(f"Switched to profile: {selected_profile}, reloading...")
+                print("Reloading archon graph")
                 reload_archon_graph(show_reload_success=False)
                 st.rerun()
             else:
@@ -326,7 +327,7 @@ def environment_tab(db_client):
         st.header("3. Database")
         
         # Database information
-        env_subpage.show_database_info(st, profile_env_vars, updated_values)
+        env_subpage.get_database_configuration(st, profile_env_vars, updated_values)
         
         # Submit button
         submitted = st.form_submit_button("Save Environment Variables")

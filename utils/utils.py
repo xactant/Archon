@@ -367,23 +367,27 @@ def reload_archon_graph(show_reload_success=True):
     """Reload the archon_graph module to apply new environment variables"""
     try:
         # First reload pydantic_ai_coder
+        print("Reloading pydantic_ai_coder")
         import archon.pydantic_ai_coder
         importlib.reload(archon.pydantic_ai_coder)
         
         # Then reload archon_graph which imports pydantic_ai_coder
+        print("Reloading archon_graph")
         import archon.archon_graph
         importlib.reload(archon.archon_graph)
 
         # Then reload the crawler
+        print("Reloading crawl_pydantic_ai_docs")
         import archon.crawl_pydantic_ai_docs
         importlib.reload(archon.crawl_pydantic_ai_docs)        
         
         if show_reload_success:
             st.success("Successfully reloaded Archon modules with new environment variables!")
+        print("Reloading archon graph complete")
         return True
     except Exception as e:
         st.error(f"Error reloading Archon modules: {str(e)}")
-        return False        
+        return False
 
 def get_clients():
     # LLM client setup
@@ -391,6 +395,7 @@ def get_clients():
     base_url = get_env_var('EMBEDDING_BASE_URL') or 'https://api.openai.com/v1'
     api_key = get_env_var('EMBEDDING_API_KEY') or 'no-api-key-provided'
     provider = get_env_var('EMBEDDING_PROVIDER') or 'OpenAI'
+    
     # Setup OpenAI client for LLM
     if provider == "Ollama":
         if api_key == "NOT_REQUIRED":
@@ -401,6 +406,6 @@ def get_clients():
 
     # Database client setup
     database_client_name = get_env_var("DATABASE_CLIENT_NAME") or "supabase"
-    dbClient = DbFactory().create_client(database_client_name)
+    dbClient = DbFactory().get_client(database_client_name)
 
     return embedding_client, dbClient      

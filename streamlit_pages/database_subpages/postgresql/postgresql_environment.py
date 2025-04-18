@@ -1,7 +1,11 @@
 from archon.db.db_client import DbClient
+from utils.env_utils import get_env_var
 from .. import EnvironmentBase
 
 class PostgresqlEnvironment(EnvironmentBase):
+    """
+    Subclass for PostgreSQL environment operations.
+    """
     def __init__(self, db_client: DbClient):
         super().__init__(db_client)
 
@@ -9,9 +13,15 @@ class PostgresqlEnvironment(EnvironmentBase):
         """
         Get the database configuration settings.
         """
+        env_postgres_url = get_env_var("POSTGRES_HOST")
+        env_postgres_port = get_env_var("POSTGRES_PORT")
+        env_postgres_db = get_env_var("POSTGRES_DB")
+        env_postgres_user = get_env_var("POSTGRES_USER")
+        env_postgres_password = get_env_var("POSTGRES_PASSWORD")
+
         postgres_url = st.text_input(
             "POSTGRES_HOST:",
-            value=profile_env_vars.get("POSTGRES_HOST", ""),
+            value=profile_env_vars.get("POSTGRES_HOST", env_postgres_url),
             key="input_POSTGRES_HOST"
         )
         updated_values["POSTGRES_HOST"] = postgres_url
@@ -19,7 +29,7 @@ class PostgresqlEnvironment(EnvironmentBase):
         # If there's already a value, show asterisks in the placeholder
         postgres_port = st.text_input(
             "POSTGRES_PORT:",
-            value=profile_env_vars.get("POSTGRES_PORT", "5432"),
+            value=profile_env_vars.get("POSTGRES_PORT", env_postgres_port),
             key="input_POSTGRES_PORT"
         )
         # Only update if user entered something (to avoid overwriting with empty string)
@@ -29,7 +39,7 @@ class PostgresqlEnvironment(EnvironmentBase):
         # If there's already a value, show asterisks in the placeholder
         postgres_db = st.text_input(
             "POSTGRES_DB:",
-            value=profile_env_vars.get("POSTGRES_DB", "postgres"),
+            value=profile_env_vars.get("POSTGRES_DB", env_postgres_db),
             key="input_POSTGRES_DB"
         )
         # Only update if user entered something (to avoid overwriting with empty string)
@@ -39,7 +49,7 @@ class PostgresqlEnvironment(EnvironmentBase):
         # If there's already a value, show asterisks in the placeholder
         postgres_user = st.text_input(
             "POSTGRES_USER:",
-            value=profile_env_vars.get("POSTGRES_USER", "postgres"),
+            value=profile_env_vars.get("POSTGRES_USER", env_postgres_user),
             key="input_POSTGRES_USER"
         )
         # Only update if user entered something (to avoid overwriting with empty string)
@@ -50,7 +60,7 @@ class PostgresqlEnvironment(EnvironmentBase):
         postgres_password = st.text_input(
             "POSTGRES_PASSWORD:",
             type="password",
-            value=profile_env_vars.get("POSTGRES_PASSWORD", ""),
+            value=profile_env_vars.get("POSTGRES_PASSWORD", env_postgres_password),
             key="input_POSTGRES_PASSWORD",
             placeholder="Pasword is set but hidden"
         )

@@ -1,32 +1,35 @@
+"""
+Factory for creating database subpage instances based on the database type.
+"""
 
+from .supabase import SupabaseDatabase, SupabaseDocumentation, SupabaseEnvironment
+from .postgresql import PostgresqlDatabase, PostgresqlDocumentation, PostgresqlEnvironment
 from archon.db.db_client import DbClient
-from supabase.supabase_database import SupabaseDatabase
-from supabase.supabase_documentation import SupabaseDocumentation
-from supabase.supabase_environment import SupabaseEnvironment
-from postgresql.postgresql_database import PostgresqlDatabase
-from postgresql.postgresql_documentation import PostgresqlDocumentation
-from postgresql.postgresql_environment import PostgresqlEnvironment
 
 class DatabaseSubpagesFactory:
+    """Factory class for creating database subpage instances."""
+    
     def __init__(self, db_client: DbClient):
+        """Initialize the factory with a database client."""
         self.db_client = db_client
+
+    def get_subpage(self, page_type: str):
+        """Get the appropriate subpage instance based on the database type."""
+        db_type = self.db_client.db_name().lower()
         
-    def get_subpage(self, subpage_name: str):
-        db_name = self.db_client.db_name()
-        match_name = f'{db_name}_{subpage_name}'
-        
-        match match_name:
-            case 'supabase_database':
+        if db_type == 'supabase':
+            if page_type == 'database':
                 return SupabaseDatabase(self.db_client)
-            case 'supabase_documentation':
+            elif page_type == 'documentation':
                 return SupabaseDocumentation(self.db_client)
-            case 'supabase_environment':
+            elif page_type == 'environment':
                 return SupabaseEnvironment(self.db_client)
-            case 'postgresql_database':
+        elif db_type == 'postgresql':
+            if page_type == 'database':
                 return PostgresqlDatabase(self.db_client)
-            case 'postgresql_documentation':
+            elif page_type == 'documentation':
                 return PostgresqlDocumentation(self.db_client)
-            case 'postgresql_environment':
-                return PostgresqlEnvironment(self.db_client) 
-            case _:
-                raise ValueError(f'Invalid subpage name: {subpage_name}')
+            elif page_type == 'environment':
+                return PostgresqlEnvironment(self.db_client)
+        
+        raise ValueError(f"Invalid database type '{db_type}' or page type '{page_type}'")

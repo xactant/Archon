@@ -4,6 +4,9 @@ from .. import DatabaseBase
 
 
 class SupabaseDatabase(DatabaseBase):
+    """
+    Subclass for Supabase database operations.
+    """
     def __init__(self, db_client: DbClient):
         super().__init__(db_client)
         
@@ -64,4 +67,11 @@ class SupabaseDatabase(DatabaseBase):
         supabase_url = get_env_var("SUPABASE_URL")
         if supabase_url:
             dashboard_url = self.get_supabase_sql_editor_url(supabase_url)
-            st.markdown(f"[Open Your Supabase SQL Editor with this URL]({dashboard_url})")    
+            st.markdown(f"[Open Your Supabase SQL Editor with this URL]({dashboard_url})")   
+    
+    def count_site_pages(self):
+        """
+        Count the total number of records in the site_pages table.
+        """
+        result = self.db_client.count_site_pages()
+        return result.count if hasattr(result, "count") else 0

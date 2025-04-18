@@ -8,7 +8,7 @@ from archon.db.db_client import DbClient
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from archon.crawl_pydantic_ai_docs import start_crawl_with_requests, clear_existing_records
 from utils.utils import get_env_var, create_new_tab_button
-from database_subpages.database_subpages_factory import DatabaseSubpagesFactory
+from streamlit_pages.database_subpages.database_subpages_factory import DatabaseSubpagesFactory
 
 def get_documentation_subpages(db_client: DbClient):
     factory = DatabaseSubpagesFactory(db_client)
@@ -43,7 +43,7 @@ def documentation_tab(db_client):
         This process may take several minutes depending on the number of pages.
         """)
         
-        if doc_subpage.client_configured() is False:
+        if doc_subpage.db_client_configured() is False:
             st.warning(f"⚠️ {doc_subpage.get_db_name()} is not configured. Please set up your environment variables first.")
             create_new_tab_button("Go to Environment Section", "Environment", key="goto_env_from_docs")
         else:
@@ -147,9 +147,7 @@ def documentation_tab(db_client):
         st.subheader("Database Statistics")
         try:            
             # Query the count of Pydantic AI docs
-            result = doc_subpage.count_site_pages()
-
-            count = result.count if hasattr(result, "count") else 0
+            count = doc_subpage.count_site_pages()
             
             # Display the count
             st.metric("Pydantic AI Docs Chunks", count)
@@ -157,10 +155,10 @@ def documentation_tab(db_client):
             # Add a button to view the data
             if count > 0 and st.button("View Indexed Data", key="view_pydantic_data"):
                 # Query a sample of the data
-                sample_data = doc_subpage.get_sample_data()
+                sample_data = doc_subpage.get_sample_data(source="pydantic_ai_docs", limit=10)
                 
                 # Display the sample data
-                st.dataframe(sample_data.data)
+                st.dataframe(sample_data)
                 st.info("Showing up to 10 sample records. The database contains more records.")
         except Exception as e:
             st.error(f"Error querying database: {str(e)}")
